@@ -1,0 +1,91 @@
+---
+title: "Project to predict and quantify the manner in which the exercise was done"
+author: "Mayank Pundir"
+date: '`r Sys.Date()`'
+---
+##Executive summary:-
+This report provides an analysis and evaluation of the data collected to predict which is better exercise out of 5 different ways to quantify how well they do it.
+              The method of analysis includes prediction model and exploratory data analyses.The data was extracted from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: <http://groupware.les.inf.puc-rio.br/har>.
+              
+##Data 
+The training data for this project are available here: 
+<https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv>
+The test data are available here: 
+<https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv>
+
+##Exploratory data analyses:-
+Lets first check the data content and datatype for the training dataset
+```{r,echo=TRUE,message=FALSE,warning=FALSE,cache=TRUE}
+temp <- tempfile()
+url <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+download.file(url,temp,method="curl")
+#Replace blank fields to NA
+file <- read.csv(temp,header = TRUE,sep = ",",na.strings = c("NA", ""))
+dim(file)
+```
+
+Before starting with the analysis we will do some data cleaning to the training data.We will be removing fields having sum <> 0 to make data more clean and accurate for prediction.
+
+```{r,echo=TRUE,message=FALSE,warning=FALSE,cache=TRUE}
+#Select colums having sum=0 
+test <- file[,colSums(is.na(file))==0]
+#Remove columns not need for predection like X,user_name,raw_timestamp_part_1,raw_timestamp_part_2,
+#cvtd_timestap,new_window and num_window
+final <- test[,!names(test) %in% names(test[,c(1,2,3,4,5,6,7)])]
+
+dim(final)
+```
+
+Now since the data has been cleaned up and reduced to reqired fields we will do cross data validation by breaking the training data into training and test data.
+
+##cross data validation
+```{r,echo=TRUE,message=FALSE,warning=FALSE,cache=TRUE}
+library(caret);library(kernlab);
+#Breaking data into 75% training and 25% testing data for cross data validation
+intain <- createDataPartition(y=final$classe,p=0.75,list=FALSE)
+training <- final[intain,]
+testing <- final[-intain,]
+dim(training);dim(testing)
+```
+
+###Create Fit Model
+We will create a fit model using training data with method= Knn(K-nearest neighbor)
+```{r,echo=TRUE,message=FALSE,warning=FALSE,cache=TRUE}
+modelfit <- train(classe ~ .,data=training,method="knn",preProcess = c("center", "scale"),
+                  tuneLength = 10,
+                  trControl = trainControl(method = "cv"))
+modelfit
+modelfit$finalModel
+prediction <- predict(modelfit,newdata=testing)
+```
+
+After creating the fit model we will do prediction on testing data created and create confusionMatrix.
+```{r,echo=TRUE,message=FALSE,warning=FALSE,cache=TRUE}
+modelfit$finalModel
+prediction <- predict(modelfit,newdata=testing)
+confusionMatrix(prediction,testing$classe)
+```
+
+Below is the Plot created showing all the feature of outcome classe against other fields.
+
+```{r ,echo=TRUE,message=FALSE,warning=FALSE,cache=TRUE}
+library(knitr)
+featurePlot(x=testing[,grep("total",names(testing))],y=testing$classe,plot="pairs")
+```
+
+##Out of sample error
+As from above you can see the out of sample error Accuracy = 0.9676
+
+##Applying Above prediction to test
+```{r ,echo=TRUE,message=FALSE,warning=FALSE,cache=TRUE}
+temp <- tempfile()
+url <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+download.file(url,temp,method="curl")
+test <- read.csv(temp,header = TRUE,sep = ",",na.strings = c("NA", ""))
+x <- as.character(predict(modelfit,newdata=test))
+```
+
+##Results
+```{r ,echo=TRUE,message=FALSE,warning=FALSE,cache=TRUE}
+print(x)
+```
